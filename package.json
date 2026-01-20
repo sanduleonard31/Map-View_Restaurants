@@ -1,0 +1,13 @@
+{
+  "name": "manager-restaurante",
+  "version": "1.0.0",
+  "description": "Manager Restaurante București - PWA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["restaurante", "bucuresti", "pwa"],
+  "author": "",
+  "license": "ISC"
+}

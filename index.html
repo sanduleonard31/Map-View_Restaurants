@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Manager Restaurante București - Gestionează restaurante pe sectoare">
+    
+    <title>Manager Restaurante</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary: #764ba2;
+            --success: #48bb78;
+            --warning: #ed8936;
+            --danger: #f56565;
+            --dark: #2d3748;
+            --light: #f7fafc;
+            --gray: #718096;
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--light);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            color: var(--dark);
+            padding-bottom: calc(70px + var(--safe-bottom));
+            overflow-x: hidden;
+        }
+        
+        /* Bottom Navigation - Mobile First */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0;
+            padding-bottom: calc(8px + var(--safe-bottom));
+            box-shadow: 0 -2px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            color: var(--gray);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 12px;
+        }
+        
+        .nav-item.active {
+            color: var(--primary);
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .nav-item .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            padding: 20px 16px;
+            padding-top: calc(20px + var(--safe-top));
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        
+        .header p {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+        
+        /* Main Content */
+        .container {
+            padding: 16px;
+            max-width: 100%;
+        }
+        
+        /* Sections */
+        .section {
+            display: none;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .stat-card .number {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .stat-card .label {
+            font-size: 0.75em;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .action-btn {
+            background: white;
+            border: none;
+            border-radius: 16px;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .action-btn .icon {
+            font-size: 2em;
+        }
+        
+        .action-btn .text {
+            font-size: 0.9em;
+            font-weight: 500;
+            color: var(--dark);
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+        
+        .action-btn.primary .text {
+            color: white;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .card h3 {
+            font-size: 1.1em;
+            color: var(--dark);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.85em;
+            font-weight: 500;
+            color: var(--dark);
+            margin-bottom: 6px;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-outline {
+            background: white;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        /* Restaurant List */
+        .restaurant-list {
+            margin-top: 16px;
+        }
+        
+        .restaurant-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: relative;
+        }
+        
+        .restaurant-item .zone-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        
+        .restaurant-item h4 {
+            font-size: 1.1em;
+            color: var(--dark);
+            margin-bottom: 8px;
+            padding-right: 70px;
+        }
+        
+        .restaurant-item .info {
+            font-size: 0.85em;
+            color: var(--gray);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .restaurant-item .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+        
+        .restaurant-item .actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .restaurant-item .actions .btn-edit {
+            background: #e2e8f0;
+            color: var(--dark);
+        }
+        
+        .restaurant-item .actions .btn-delete {
+            background: #fed7d7;
+            color: var(--danger);
+        }
+        
+        .restaurant-item .actions .btn-map {
+            background: #bee3f8;
+            color: #2b6cb0;
+        }
+        
+        /* Zone colors */
+        .zone-1 { background: #c6f6d520; color: #276749; }
+        .zone-2 { background: #bee3f820; color: #2b6cb0; }
+        .zone-3 { background: #feebc820; color: #c05621; }
+        .zone-4 { background: #fed7d720; color: #c53030; }
+        .zone-5 { background: #e9d8fd20; color: #6b46c1; }
+        .zone-6 { background: #c3dafe20; color: #3c366b; }
+        
+        /* Search & Filter */
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        
+        .search-bar input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+        }
+        
+        .search-bar select {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            background: white;
+            min-width: 100px;
+        }
+        
+        /* Map */
+        .map-container {
+            height: calc(100vh - 200px);
+            min-height: 400px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        #mainMap {
+            height: 100%;
+            width: 100%;
+        }
+        
+        /* Zone Filter Pills */
+        .zone-pills {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 0 16px 0;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .zone-pills::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .zone-pill {
+            flex-shrink: 0;
+            padding: 10px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            background: white;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .zone-pill.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        /* Alert/Toast */
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 16px;
+            right: 16px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 500;
+            z-index: 2000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--primary); }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1500;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 24px 24px 0 0;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px 16px;
+            padding-bottom: calc(24px + var(--safe-bottom));
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        
+        .modal-handle {
+            width: 40px;
+            height: 4px;
+            background: #ddd;
+            border-radius: 2px;
+            margin: 0 auto 20px auto;
+        }
+        
+        .modal h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 16px;
+            padding: 30px 20px;
+            text-align: center;
+            background: #f8fafc;
+            transition: all 0.2s;
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: #f0f4ff;
+        }
+        
+        .upload-area .icon {
+            font-size: 3em;
+            margin-bottom: 12px;
+        }
+        
+        /* Fab Button */
+        .fab {
+            position: fixed;
+            bottom: calc(90px + var(--safe-bottom));
+            right: 16px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .fab:active {
+            transform: scale(0.95);
+        }
+        
+        /* Tutorial */
+        .tutorial-item {
+            display: flex;
+            gap: 12px;
+            padding: 16px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .tutorial-item:last-child {
+            border-bottom: none;
+        }
+        
+        .tutorial-item .step {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .tutorial-item .content h4 {
+            font-size: 1em;
+            margin-bottom: 4px;
+        }
+        
+        .tutorial-item .content p {
+            font-size: 0.85em;
+            color: var(--gray);
+            line-height: 1.5;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray);
+        }
+        
+        .empty-state .icon {
+            font-size: 4em;
+            margin-bottom: 16px;
+        }
+        
+        /* PWA Install Banner */
+        .install-banner {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            left: 16px;
+            right: 16px;
+            background: white;
+            padding: 16px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 999;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .install-banner.show {
+            display: flex;
+        }
+        
+        .install-banner .icon {
+            font-size: 2em;
+        }
+        
+        .install-banner .text {
+            flex: 1;
+        }
+        
+        .install-banner .text h4 {
+            font-size: 0.95em;
+            margin-bottom: 2px;
+        }
+        
+        .install-banner .text p {
+            font-size: 0.8em;
+            color: var(--gray);
+        }
+        
+        .install-banner button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .install-banner .btn-install {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .install-banner .btn-close {
+            background: #eee;
+            color: var(--gray);
+        }
+        
+        /* Desktop Adjustments */
+        @media (min-width: 768px) {
+            body {
+                padding-bottom: 0;
+            }
+            
+            .bottom-nav {
+                display: none;
+            }
+            
+            .desktop-nav {
+                display: flex !important;
+            }
+            
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+            }
+            
+            .fab {
+                bottom: 24px;
+            }
+        }
+        
+        .desktop-nav {
+            display: none;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            margin-top: 12px;
+        }
+        
+        .desktop-nav button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .desktop-nav button.active {
+            background: white;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1>🍽️ Manager Restaurante</h1>
+        <p id="headerSubtitle">București • <span id="headerCount">0</span> restaurante</p>
+        
+        <div class="desktop-nav">
+            <button onclick="showSection('home')" id="desk-home" class="active">Acasă</button>
+            <button onclick="showSection('data')" id="desk-data">Date</button>
+            <button onclick="showSection('maps')" id="desk-maps">Hartă</button>
+            <button onclick="showSection('settings')" id="desk-settings">Setări</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- HOME SECTION -->
+        <section id="section-home" class="section active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="number" id="totalRestaurants">0</div>
+                    <div class="label">Restaurante</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="totalZones">0</div>
+                    <div class="label">Sectoare</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="totalTypes">0</div>
+                    <div class="label">Categorii</div>
+                </div>
+            </div>
+            
+            <div class="quick-actions">
+                <button class="action-btn primary" onclick="openAddModal()">
+                    <span class="icon">➕</span>
+                    <span class="text">Adaugă Restaurant</span>
+                </button>
+                <button class="action-btn" onclick="generateExcel()">
+                    <span class="icon">📊</span>
+                    <span class="text">Generează Excel</span>
+                </button>
+                <button class="action-btn" onclick="showSection('maps')">
+                    <span class="icon">🗺️</span>
+                    <span class="text">Vezi Harta</span>
+                </button>
+                <button class="action-btn" onclick="showSection('data')">
+                    <span class="icon">📋</span>
+                    <span class="text">Vezi Lista</span>
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3>📖 Cum funcționează</h3>
+                <div class="tutorial-item">
+                    <div class="step">1</div>
+                    <div class="content">
+                        <h4>Adaugă restaurante</h4>
+                        <p>Folosește butonul + pentru a adăuga manual sau importă un fișier CSV</p>
+                    </div>
+                </div>
+                <div class="tutorial-item">
+                    <div class="step">2</div>
+                    <div class="content">
+                        <h4>Vizualizează pe hartă</h4>
+                        <p>Vezi toate restaurantele pe hartă, filtrează pe sectoare</p>
+                    </div>
+                </div>
+                <div class="tutorial-item">
+                    <div class="step">3</div>
+                    <div class="content">
+                        <h4>Exportă date</h4>
+                        <p>Generează Excel cu linkuri Google Maps și numere de telefon</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>📤 Import CSV</h3>
+                <p style="font-size: 0.85em; color: var(--gray); margin-bottom: 12px;">
+                    Format: <code style="background:#eee;padding:2px 6px;border-radius:4px;">Zonă,Nume,Adresă,Tip,Telefon</code>
+                </p>
+                <div class="upload-area" id="dropZone">
+                    <div class="icon">📂</div>
+                    <p style="font-weight:500;">Trage fișierul CSV aici</p>
+                    <p style="font-size:0.85em;color:var(--gray);margin-top:4px;">sau apasă pentru a selecta</p>
+                    <input type="file" id="fileInput" accept=".csv,.txt" style="display:none;">
+                </div>
+                <div class="btn-row" style="margin-top:12px;">
+                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
+                        Selectează Fișier
+                    </button>
+                    <button class="btn btn-outline" onclick="openCSVModal()">
+                        Lipește CSV
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- DATA SECTION -->
+        <section id="section-data" class="section">
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="🔍 Caută..." oninput="filterAndRender()">
+                <select id="filterZone" onchange="filterAndRender()">
+                    <option value="">Toate</option>
+                    <option value="1">S1</option>
+                    <option value="2">S2</option>
+                    <option value="3">S3</option>
+                    <option value="4">S4</option>
+                    <option value="5">S5</option>
+                    <option value="6">S6</option>
+                </select>
+            </div>
+            
+            <div id="restaurantList" class="restaurant-list">
+                <!-- Dynamic content -->
+            </div>
+            
+            <div id="emptyState" class="empty-state" style="display:none;">
+                <div class="icon">🍽️</div>
+                <h3>Niciun restaurant</h3>
+                <p>Adaugă primul restaurant folosind butonul +</p>
+            </div>
+        </section>
+
+        <!-- MAPS SECTION -->
+        <section id="section-maps" class="section">
+            <div class="zone-pills">
+                <button class="zone-pill active" data-zone="all" onclick="filterMapZone('all')">Toate</button>
+                <button class="zone-pill" data-zone="1" onclick="filterMapZone('1')">Sector 1</button>
+                <button class="zone-pill" data-zone="2" onclick="filterMapZone('2')">Sector 2</button>
+                <button class="zone-pill" data-zone="3" onclick="filterMapZone('3')">Sector 3</button>
+                <button class="zone-pill" data-zone="4" onclick="filterMapZone('4')">Sector 4</button>
+                <button class="zone-pill" data-zone="5" onclick="filterMapZone('5')">Sector 5</button>
+                <button class="zone-pill" data-zone="6" onclick="filterMapZone('6')">Sector 6</button>
+            </div>
+            
+            <p id="mapInfo" style="text-align:center;font-size:0.9em;color:var(--gray);margin-bottom:12px;"></p>
+            
+            <div class="map-container">
+                <div id="mainMap"></div>
+            </div>
+        </section>
+
+        <!-- SETTINGS SECTION -->
+        <section id="section-settings" class="section">
+            <div class="card">
+                <h3>📥 Export Date</h3>
+                <button class="btn btn-primary" onclick="generateExcel()" style="margin-bottom:12px;">
+                    📊 Generează Excel
+                </button>
+                <button class="btn btn-outline" onclick="exportCSV()">
+                    📄 Exportă CSV
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3>🔄 Gestionare Date</h3>
+                <button class="btn btn-outline" onclick="loadDefaultData()" style="margin-bottom:12px;">
+                    🔄 Încarcă Date Implicite
+                </button>
+                <button class="btn btn-danger" onclick="clearAllData()">
+                    🗑️ Șterge Toate Datele
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3>ℹ️ Despre</h3>
+                <p style="font-size:0.9em;color:var(--gray);line-height:1.6;">
+                    Manager Restaurante București v1.0<br>
+                    Datele sunt stocate local în browser.<br>
+                    Funcționează offline după prima încărcare.
+                </p>
+            </div>
+        </section>
+    </div>
+
+    <!-- FAB Button -->
+    <button class="fab" onclick="openAddModal()" id="fabBtn">+</button>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="showSection('home')" id="nav-home">
+            <span class="icon">🏠</span>
+            <span>Acasă</span>
+        </button>
+        <button class="nav-item" onclick="showSection('data')" id="nav-data">
+            <span class="icon">📋</span>
+            <span>Date</span>
+        </button>
+        <button class="nav-item" onclick="showSection('maps')" id="nav-maps">
+            <span class="icon">🗺️</span>
+            <span>Hartă</span>
+        </button>
+        <button class="nav-item" onclick="showSection('settings')" id="nav-settings">
+            <span class="icon">⚙️</span>
+            <span>Setări</span>
+        </button>
+    </nav>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-handle"></div>
+            <h2 id="modalTitle">Adaugă Restaurant</h2>
+            
+            <input type="hidden" id="editIndex" value="-1">
+            
+            <div class="form-group">
+                <label>Sector *</label>
+                <select id="inputZone" required>
+                    <option value="1">Sector 1</option>
+                    <option value="2">Sector 2</option>
+                    <option value="3">Sector 3</option>
+                    <option value="4">Sector 4</option>
+                    <option value="5">Sector 5</option>
+                    <option value="6">Sector 6</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Nume Restaurant *</label>
+                <input type="text" id="inputName" placeholder="ex: La Cucina" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Adresă *</label>
+                <input type="text" id="inputAddress" placeholder="ex: Str. Dorobanți 45" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Tip</label>
+                <input type="text" id="inputType" placeholder="ex: Restaurant Italian" list="typesList">
+                <datalist id="typesList">
+                    <option value="Restaurant">
+                    <option value="Restaurant Italian">
+                    <option value="Restaurant Românesc">
+                    <option value="Pizzerie">
+                    <option value="Bistro">
+                    <option value="Restaurant Japonez">
+                    <option value="Restaurant Asiatic">
+                    <option value="Fast Food">
+                </datalist>
+            </div>
+            
+            <div class="form-group">
+                <label>Telefon</label>
+                <input type="tel" id="inputPhone" placeholder="ex: 0721234567">
+            </div>
+            
+            <div class="btn-row">
+                <button class="btn btn-outline" onclick="closeModal()">Anulează</button>
+                <button class="btn btn-primary" onclick="saveRestaurant()">Salvează</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Modal -->
+    <div class="modal-overlay" id="csvModal">
+        <div class="modal">
+            <div class="modal-handle"></div>
+            <h2>Import CSV</h2>
+            
+            <div class="form-group">
+                <label>Lipește datele CSV</label>
+                <textarea id="csvTextarea" placeholder="1,La Cucina,Str. Dorobanți 45,Restaurant Italian,0721234567
+1,Pizza Roma,Str. Floreasca 10,Pizzerie,"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="csvReplace">
+                    Înlocuiește datele existente
+                </label>
+            </div>
+            
+            <div class="btn-row">
+                <button class="btn btn-outline" onclick="closeCSVModal()">Anulează</button>
+                <button class="btn btn-primary" onclick="importCSVText()">Importă</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Install Banner -->
+    <div class="install-banner" id="installBanner">
+        <div class="icon">📱</div>
+        <div class="text">
+            <h4>Instalează aplicația</h4>
+            <p>Adaugă pe ecranul principal</p>
+        </div>
+        <button class="btn-close" onclick="hideInstallBanner()">✕</button>
+        <button class="btn-install" onclick="installApp()">Instalează</button>
+    </div>
+
+    <script>
+        // ============== CONSTANTS ==============
+        const STORAGE_KEY = 'restaurant_data_v2';
+        let restaurantData = [];
+        let map = null;
+        let markerCluster = null;
+        let currentMapZone = 'all';
+        let deferredPrompt = null;
+        
+        const SECTOR_CENTERS = {
+            '1': [44.4720, 26.0850],
+            '2': [44.4380, 26.1350],
+            '3': [44.4100, 26.1450],
+            '4': [44.4050, 26.0900],
+            '5': [44.4200, 26.0500],
+            '6': [44.4450, 26.0200],
+            'all': [44.4268, 26.1025]
+        };
+        
+        const ZONE_COLORS = {
+            '1': '#48bb78', '2': '#4299e1', '3': '#ed8936',
+            '4': '#f56565', '5': '#9f7aea', '6': '#667eea'
+        };
+        
+        const TYPE_COLORS = {
+            'pizzerie': '#f56565', 'bistro': '#4299e1',
+            'restaurant italian': '#ed8936', 'italian': '#ed8936',
+            'restaurant românesc': '#276749', 'românesc': '#276749',
+            'restaurant japonez': '#ed64a6', 'japonez': '#ed64a6',
+            'asiatic': '#ed64a6', 'restaurant': '#48bb78'
+        };
+
+        const API_BASE = window.location.origin;
+        let useDatabase = false;
+
+        // ============== INIT ==============
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkDatabase();
+            await loadData();
+            setupFileUpload();
+            setupModalClose();
+            setupPWA();
+        });
+
+        async function checkDatabase() {
+            try {
+                const res = await fetch(`${API_BASE}/api/health`);
+                const data = await res.json();
+                useDatabase = data.database === true;
+                console.log('Database mode:', useDatabase);
+            } catch(e) {
+                useDatabase = false;
+            }
+        }
+
+        async function loadData() {
+            // Try loading from database first
+            if (useDatabase) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/restaurants`);
+                    const data = await res.json();
+                    if (data.data && data.data.length > 0) {
+                        restaurantData = data.data;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(restaurantData));
+                        updateStats();
+                        return;
+                    }
+                } catch(e) {
+                    console.log('Database fetch failed, using localStorage');
+                }
+            }
+            
+            // Fallback to localStorage
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try { restaurantData = JSON.parse(stored); } 
+                catch(e) { restaurantData = []; }
+            }
+            if (restaurantData.length === 0) await loadDefaultData();
+            else updateStats();
+        }
+
+        async function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(restaurantData));
+            updateStats();
+            
+            // Sync to database if available
+            if (useDatabase) {
+                try {
+                    await fetch(`${API_BASE}/api/sync`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ restaurants: restaurantData })
+                    });
+                } catch(e) {
+                    console.log('Database sync failed');
+                }
+            }
+        }
+
+        async function loadDefaultData() {
+            try {
+                const response = await fetch('data.csv');
+                const text = await response.text();
+                restaurantData = parseCSV(text);
+                await saveData();
+                showToast('Date încărcate!', 'success');
+            } catch(e) {
+                console.log('Nu s-au putut încărca datele implicite');
+            }
+        }
+
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            return lines.filter(l => l.trim()).map(line => {
+                const parts = line.split(',');
+                if (parts.length >= 4) {
+                    return {
+                        zone: parts[0].trim(),
+                        name: parts[1].trim(),
+                        address: parts[2].trim(),
+                        type: parts[3].trim(),
+                        phone: parts[4]?.trim() || ''
+                    };
+                }
+                return null;
+            }).filter(Boolean);
+        }
+
+        function updateStats() {
+            document.getElementById('totalRestaurants').textContent = restaurantData.length;
+            document.getElementById('headerCount').textContent = restaurantData.length;
+            
+            const zones = new Set(restaurantData.map(r => r.zone));
+            document.getElementById('totalZones').textContent = zones.size;
+            
+            const types = new Set(restaurantData.map(r => r.type.toLowerCase()));
+            document.getElementById('totalTypes').textContent = types.size;
+        }
+
+        // ============== NAVIGATION ==============
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById('section-' + id).classList.add('active');
+            
+            document.querySelectorAll('.nav-item, .desktop-nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById('nav-' + id)?.classList.add('active');
+            document.getElementById('desk-' + id)?.classList.add('active');
+            
+            // Show/hide FAB
+            const fab = document.getElementById('fabBtn');
+            fab.style.display = (id === 'data' || id === 'home') ? 'flex' : 'none';
+            
+            if (id === 'maps' && !map) setTimeout(initMap, 100);
+            if (id === 'data') filterAndRender();
+        }
+
+        // ============== RESTAURANT CRUD ==============
+        function filterAndRender() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const zone = document.getElementById('filterZone').value;
+            
+            let filtered = restaurantData.filter(r => {
+                const matchSearch = !search || 
+                    r.name.toLowerCase().includes(search) ||
+                    r.address.toLowerCase().includes(search) ||
+                    r.type.toLowerCase().includes(search);
+                const matchZone = !zone || r.zone === zone;
+                return matchSearch && matchZone;
+            });
+            
+            renderList(filtered);
+        }
+
+        function renderList(data) {
+            const container = document.getElementById('restaurantList');
+            const empty = document.getElementById('emptyState');
+            
+            if (data.length === 0) {
+                container.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            
+            empty.style.display = 'none';
+            container.innerHTML = data.map((r, i) => {
+                const realIndex = restaurantData.indexOf(r);
+                return `
+                <div class="restaurant-item">
+                    <span class="zone-badge zone-${r.zone}">S${r.zone}</span>
+                    <h4>${r.name}</h4>
+                    <div class="info">📍 ${r.address}</div>
+                    <div class="info">🍽️ ${r.type}</div>
+                    ${r.phone ? `<div class="info">📞 <a href="tel:${r.phone}">${r.phone}</a></div>` : ''}
+                    <div class="actions">
+                        <button class="btn-map" onclick="openInMaps('${encodeURIComponent(r.name)}', '${encodeURIComponent(r.address)}')">🗺️ Maps</button>
+                        <button class="btn-edit" onclick="openEditModal(${realIndex})">✏️ Editează</button>
+                        <button class="btn-delete" onclick="deleteRestaurant(${realIndex})">🗑️ Șterge</button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'Adaugă Restaurant';
+            document.getElementById('editIndex').value = -1;
+            document.getElementById('inputZone').value = '1';
+            document.getElementById('inputName').value = '';
+            document.getElementById('inputAddress').value = '';
+            document.getElementById('inputType').value = '';
+            document.getElementById('inputPhone').value = '';
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function openEditModal(index) {
+            const r = restaurantData[index];
+            document.getElementById('modalTitle').textContent = 'Editează Restaurant';
+            document.getElementById('editIndex').value = index;
+            document.getElementById('inputZone').value = r.zone;
+            document.getElementById('inputName').value = r.name;
+            document.getElementById('inputAddress').value = r.address;
+            document.getElementById('inputType').value = r.type;
+            document.getElementById('inputPhone').value = r.phone || '';
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('editModal').classList.remove('show');
+        }
+
+        async function saveRestaurant() {
+            const index = parseInt(document.getElementById('editIndex').value);
+            const data = {
+                zone: document.getElementById('inputZone').value,
+                name: document.getElementById('inputName').value.trim(),
+                address: document.getElementById('inputAddress').value.trim(),
+                type: document.getElementById('inputType').value.trim() || 'Restaurant',
+                phone: document.getElementById('inputPhone').value.trim()
+            };
+            
+            if (!data.name || !data.address) {
+                showToast('Completează numele și adresa!', 'error');
+                return;
+            }
+            
+            if (index === -1) {
+                restaurantData.push(data);
+                showToast('Restaurant adăugat!', 'success');
+            } else {
+                restaurantData[index] = data;
+                showToast('Restaurant actualizat!', 'success');
+            }
+            
+            await saveData();
+            closeModal();
+            filterAndRender();
+            if (map) updateMap();
+        }
+
+        async function deleteRestaurant(index) {
+            if (!confirm(`Ștergi "${restaurantData[index].name}"?`)) return;
+            restaurantData.splice(index, 1);
+            await saveData();
+            filterAndRender();
+            if (map) updateMap();
+            showToast('Restaurant șters!', 'success');
+        }
+
+        async function clearAllData() {
+            if (!confirm('Ștergi TOATE datele?')) return;
+            restaurantData = [];
+            await saveData();
+            filterAndRender();
+            if (map) updateMap();
+            showToast('Date șterse!', 'success');
+        }
+
+        function openInMaps(name, address) {
+            const query = encodeURIComponent(`${decodeURIComponent(name)}, ${decodeURIComponent(address)}, București`);
+            window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+        }
+
+        // ============== MAP ==============
+        function initMap() {
+            if (map) return;
+            
+            map = L.map('mainMap').setView(SECTOR_CENTERS['all'], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            markerCluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+            map.addLayer(markerCluster);
+            
+            updateMap();
+        }
+
+        function updateMap() {
+            if (!map || !markerCluster) return;
+            
+            markerCluster.clearLayers();
+            const filtered = currentMapZone === 'all' 
+                ? restaurantData 
+                : restaurantData.filter(r => r.zone === currentMapZone);
+            
+            document.getElementById('mapInfo').textContent = 
+                `${filtered.length} restaurante` + (currentMapZone !== 'all' ? ` în Sectorul ${currentMapZone}` : '');
+            
+            filtered.forEach((r, i) => {
+                const center = SECTOR_CENTERS[r.zone] || SECTOR_CENTERS['all'];
+                const coords = generateCoords(r.name, r.address, center, i, filtered.length);
+                const color = getTypeColor(r.type);
+                
+                const popup = `
+                    <div style="min-width:180px">
+                        <h4 style="margin:0 0 8px">${r.name}</h4>
+                        <p style="margin:4px 0;font-size:13px">📍 ${r.address}</p>
+                        <p style="margin:4px 0;font-size:13px">🍽️ ${r.type}</p>
+                        ${r.phone ? `<p style="margin:4px 0;font-size:13px">📞 ${r.phone}</p>` : ''}
+                        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ', ' + r.address + ', București')}" 
+                           target="_blank" style="display:block;margin-top:10px;padding:8px;background:#4285F4;color:white;text-align:center;border-radius:6px;text-decoration:none;font-size:13px">
+                            🗺️ Google Maps
+                        </a>
+                    </div>
+                `;
+                
+                const marker = L.circleMarker(coords, {
+                    radius: 8, fillColor: color, color: '#fff',
+                    weight: 2, opacity: 1, fillOpacity: 0.8
+                }).bindPopup(popup).bindTooltip(r.name);
+                
+                markerCluster.addLayer(marker);
+            });
+            
+            const center = SECTOR_CENTERS[currentMapZone] || SECTOR_CENTERS['all'];
+            map.setView(center, currentMapZone === 'all' ? 12 : 14);
+        }
+
+        function filterMapZone(zone) {
+            currentMapZone = zone;
+            document.querySelectorAll('.zone-pill').forEach(p => 
+                p.classList.toggle('active', p.dataset.zone === zone));
+            updateMap();
+        }
+
+        function generateCoords(name, address, center, index, total) {
+            let hash = 0;
+            for (let i = 0; i < (name + address).length; i++) {
+                hash = ((hash << 5) - hash) + (name + address).charCodeAt(i);
+                hash = hash & hash;
+            }
+            const angle = (Math.abs(hash) % 360) * (Math.PI / 180);
+            const radius = 0.005 + (Math.abs(hash) % 1000) / 50000;
+            return [
+                center[0] + radius * Math.cos(angle + (index / total) * Math.PI * 2),
+                center[1] + radius * Math.sin(angle + (index / total) * Math.PI * 2) * 1.5
+            ];
+        }
+
+        function getTypeColor(type) {
+            const lower = type.toLowerCase();
+            for (const [key, color] of Object.entries(TYPE_COLORS)) {
+                if (lower.includes(key)) return color;
+            }
+            return '#48bb78';
+        }
+
+        // ============== FILE UPLOAD ==============
+        function setupFileUpload() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+            });
+            
+            fileInput.addEventListener('change', e => {
+                if (e.target.files[0]) handleFile(e.target.files[0]);
+            });
+        }
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = async e => {
+                const newData = parseCSV(e.target.result);
+                if (newData.length === 0) {
+                    showToast('Fișier invalid!', 'error');
+                    return;
+                }
+                restaurantData = [...restaurantData, ...newData];
+                await saveData();
+                filterAndRender();
+                if (map) updateMap();
+                showToast(`${newData.length} restaurante importate!`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        function openCSVModal() {
+            document.getElementById('csvTextarea').value = '';
+            document.getElementById('csvReplace').checked = false;
+            document.getElementById('csvModal').classList.add('show');
+        }
+
+        function closeCSVModal() {
+            document.getElementById('csvModal').classList.remove('show');
+        }
+
+        async function importCSVText() {
+            const text = document.getElementById('csvTextarea').value;
+            const replace = document.getElementById('csvReplace').checked;
+            
+            if (!text.trim()) {
+                showToast('Introdu date CSV!', 'error');
+                return;
+            }
+            
+            const newData = parseCSV(text);
+            if (newData.length === 0) {
+                showToast('Date invalide!', 'error');
+                return;
+            }
+            
+            if (replace) restaurantData = newData;
+            else restaurantData = [...restaurantData, ...newData];
+            
+            await saveData();
+            closeCSVModal();
+            filterAndRender();
+            if (map) updateMap();
+            showToast(`${newData.length} restaurante ${replace ? 'înlocuite' : 'adăugate'}!`, 'success');
+        }
+
+        // ============== EXPORT ==============
+        function exportCSV() {
+            const csv = restaurantData.map(r => 
+                `${r.zone},${r.name},${r.address},${r.type},${r.phone || ''}`
+            ).join('\n');
+            downloadFile(csv, 'restaurante.csv', 'text/csv');
+            showToast('CSV descărcat!', 'success');
+        }
+
+        function generateExcel() {
+            if (restaurantData.length === 0) {
+                showToast('Nu există date!', 'error');
+                return;
+            }
+            
+            const wb = XLSX.utils.book_new();
+            const data = [['Zonă', 'Nume', 'Adresă', 'Tip', 'Google Maps', 'Telefon']];
+            
+            restaurantData.forEach(r => {
+                data.push([
+                    `Sector ${r.zone}`, r.name, r.address, r.type,
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ', ' + r.address + ', București')}`,
+                    r.phone || ''
+                ]);
+            });
+            
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            ws['!cols'] = [{ wch: 10 }, { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 50 }, { wch: 15 }];
+            
+            XLSX.utils.book_append_sheet(wb, ws, 'Restaurante');
+            XLSX.writeFile(wb, 'Director_Restaurante.xlsx');
+            showToast('Excel generat!', 'success');
+        }
+
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ============== UI HELPERS ==============
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function setupModalClose() {
+            document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                overlay.addEventListener('click', e => {
+                    if (e.target === overlay) {
+                        overlay.classList.remove('show');
+                    }
+                });
+            });
+        }
+
+        // ============== PWA ==============
+        function setupPWA() {
+            window.addEventListener('beforeinstallprompt', e => {
+                e.preventDefault();
+                deferredPrompt = e;
+                setTimeout(() => {
+                    document.getElementById('installBanner').classList.add('show');
+                }, 3000);
+            });
+            
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(console.log);
+            }
+        }
+
+        function installApp() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(result => {
+                deferredPrompt = null;
+                hideInstallBanner();
+            });
+        }
+
+        function hideInstallBanner() {
+            document.getElementById('installBanner').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
